@@ -3,6 +3,9 @@
 另: 数电课本
 
 ##### 数据类型, 运算符(数电第七版P64-73)
+- `begin...end`代替C:`{...}`
+- 末尾有分号`;`!
+
 ##### 数电元件/组合逻辑的描述方法(数电第七版P60)
 - a. 数据流描述("`assign`"关键字, 使用与`&`或`|`非`~`组合而成的逻辑表达式直接写出输入输出关系式, 需要手动对逻辑表达式进行化简, 但是整体简洁)
 ```C++
@@ -171,3 +174,60 @@ endmodule
 其他调试相关选项
 - `Simulate-Restart`(快捷图标`Restart`)
 - `Simulate-End Simulation`
+
+#### `quartus prime 18.1`配置`DE2-115`开发板硬件下载与引脚分配说明
+- [[野火]FPGA Verilog开发实战指南——基于Altera EP4CE10 征途Mini开发板](https://doc.embedfire.com/fpga/altera/ep4ce10_mini/zh/latest/)
+  - [点亮你的LED灯-一个完整的设计过程](https://doc.embedfire.com/fpga/altera/ep4ce10_mini/zh/latest/fpga/Led.html#id4)
+  - [如何快速批量绑定或删除管脚配置](https://doc.embedfire.com/fpga/altera/ep4ce10_mini/zh/latest/fpga/IO_Lock.html) 
+大致流程参考: 数电第七版P460
+- 在quartus中选择对应器件
+- 分配输入输出信号到相应引脚(参考开发手册)
+- 重新编译并下载文件(后缀.pof/.sof)
+- 使用jtag/as模式下载到fpga中
+
+
+##### 1. 顶层文件说明
+- 新增 `lock_top.v` 作为FPGA可综合顶层文件，端口与开发板元件一一对应。
+- 端口说明：
+  | 功能      | 顶层端口 | 板载元件 | 说明           |
+  |-----------|----------|----------|----------------|
+  | 时钟      | CLK      | CLOCK_50 | 50MHz主时钟    |
+  | 复位      | RESET    | KEY[0]   | 复位按钮       |
+  | 确认      | ENTER    | KEY[1]   | 确认按钮       |
+  | 输入      | PRESS    | KEY[2]   | 数字键输入     |
+  | 模式切换  | MODE     | SW[0]    | 拨码开关       |
+  | 密码输入  | CODE[3:0]| SW[4:1]  | 拨码开关       |
+  | 开锁指示  | OPEN     | LEDR[0]  | 红色LED        |
+  | 错误指示  | ERROR    | LEDR[1]  | 红色LED        |
+
+##### 2. 工程设置
+- `lock.qsf` 已设置 `Lock_Top` 为顶层实体，并添加 `lock_top.v`: 
+```
+set_global_assignment -name TOP_LEVEL_ENTITY Lock_Top
+set_global_assignment -name VERILOG_FILE ../lock_top.v
+```
+- 新增 `quartus_compile/lock_pins.tcl`，包含常用引脚分配脚本，可在 Quartus Tcl Console 执行(也可以重新编译, 即可自动分配管脚): 
+  ```tcl
+  source quartus_compile/lock_pins.tcl
+  ```
+- 主要引脚分配如下：
+  ```tcl
+  set_location_assignment PIN_Y2   -to CLK
+  set_location_assignment PIN_M23  -to RESET
+  set_location_assignment PIN_M21  -to ENTER
+  set_location_assignment PIN_N21  -to PRESS
+  set_location_assignment PIN_AB28 -to MODE
+  set_location_assignment PIN_AB27 -to CODE[3]
+  set_location_assignment PIN_AC26 -to CODE[2]
+  set_location_assignment PIN_AD26 -to CODE[1]
+  set_location_assignment PIN_AB26 -to CODE[0]
+  set_location_assignment PIN_G19  -to OPEN
+  set_location_assignment PIN_F19  -to ERROR
+  ```
+
+##### 3. 下载与测试流程
+1. 在 Quartus 中重新编译工程。
+2. 执行 `lock_pins.tcl` 脚本自动分配引脚。
+3. 下载 `.sof` 文件到开发板，拨码开关/按键/LED 即可直接交互测试密码锁功能。
+
+如需自定义更多功能或引脚，请参考开发板手册和 `lock_top.v` 进行扩展。

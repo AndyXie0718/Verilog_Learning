@@ -1,3 +1,8 @@
 work
 *.mti
 *.mpf
+db
+incremental_db
+quartus_compile/output_files/*
+!/quartus_compile/output_files/*.sof
+!/quartus_compile/output_files/*.pof
