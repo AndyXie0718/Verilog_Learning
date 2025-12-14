@@ -174,19 +174,41 @@ endmodule
 其他调试相关选项
 - `Simulate-Restart`(快捷图标`Restart`)
 - `Simulate-End Simulation`
+- 波形的放大与缩小(快捷图标)
+  - `Zoom in`(快捷键I)
+  - `Zoom out`(快捷键O)
+  - `Zoom full`(快捷键F)
 
 #### `quartus prime 18.1`配置`DE2-115`开发板硬件下载与引脚分配说明
 - [[野火]FPGA Verilog开发实战指南——基于Altera EP4CE10 征途Mini开发板](https://doc.embedfire.com/fpga/altera/ep4ce10_mini/zh/latest/)
   - [点亮你的LED灯-一个完整的设计过程](https://doc.embedfire.com/fpga/altera/ep4ce10_mini/zh/latest/fpga/Led.html#id4)
   - [如何快速批量绑定或删除管脚配置](https://doc.embedfire.com/fpga/altera/ep4ce10_mini/zh/latest/fpga/IO_Lock.html) 
+  - [Quartus软件和USB-Blaster驱动安装](https://doc.embedfire.com/fpga/altera/ep4ce10_mini/zh/latest/fpga/Quartus.html)
+  - [【FPGA】Quartus II安装Altera USB-Blaster安装驱动程序出现问题（代码39）的解决办法](https://www.cnblogs.com/Skyrim-sssuuu/p/18817257)
+
 大致流程参考: 数电第七版P460
-- 在quartus中选择对应器件
-- 分配输入输出信号到相应引脚(参考开发手册)
-- 重新编译并下载文件(后缀.pof/.sof)
-- 使用jtag/as模式下载到fpga中
+- 在quartus中选择对应器件(`EP4CE115F29C7`, 实际开发板后面带`N`表示无铅, 不影响烧录/管脚配置)
+- 分配输入输出信号到相应引脚(参考开发手册, 结合AI, 但是注意自己**仔细对照开发手册检查管脚**)
+- 重新编译并下载文件(后缀`.pof`/.sof)
+- 使用jtag/as模式下载到fpga中(上电仿真使用`jtag`模式, 该模式注意检查开发板左下角开关`SW19`是否打到`RUN`)
 
 
 ##### 1. 顶层文件说明
+工程名称: `lock`, 项目结构:
+```text
+modelsim_lock_new/
+├── quartus_compile/     # Quartus工程及引脚分配
+│   ├── output_files/lock.sof        # 实际下载到开发板上的sof文件
+│   ├── lock_pins.tcl        # 常用引脚分配脚本
+│   ├── lock.qpf             # Quartus工程文件
+│   ├── lock.qsf             # Quartus设置文件（含顶层、源文件、引脚分配）
+├── lock_top.v               # FPGA顶层文件（含数码管显示）
+├── new_lock.v               # 密码锁完整功能实现（数据通路+控制）
+├── tb_new_lock.v            # 密码锁完整功能仿真testbench(不含数码管)
+├── README.md                # 工程说明文档
+├── vsim.wlf                 # ModelSim仿真波形文件
+```
+
 - 新增 `lock_top.v` 作为FPGA可综合顶层文件，端口与开发板元件一一对应。
 - 端口说明：
   | 功能      | 顶层端口 | 板载元件 | 说明           |
@@ -206,28 +228,104 @@ endmodule
 set_global_assignment -name TOP_LEVEL_ENTITY Lock_Top
 set_global_assignment -name VERILOG_FILE ../lock_top.v
 ```
-- 新增 `quartus_compile/lock_pins.tcl`，包含常用引脚分配脚本，可在 Quartus Tcl Console 执行(也可以重新编译, 即可自动分配管脚): 
-  ```tcl
-  source quartus_compile/lock_pins.tcl
-  ```
-- 主要引脚分配如下：
-  ```tcl
-  set_location_assignment PIN_Y2   -to CLK
-  set_location_assignment PIN_M23  -to RESET
-  set_location_assignment PIN_M21  -to ENTER
-  set_location_assignment PIN_N21  -to PRESS
-  set_location_assignment PIN_AB28 -to MODE
-  set_location_assignment PIN_AB27 -to CODE[3]
-  set_location_assignment PIN_AC26 -to CODE[2]
-  set_location_assignment PIN_AD26 -to CODE[1]
-  set_location_assignment PIN_AB26 -to CODE[0]
-  set_location_assignment PIN_G19  -to OPEN
-  set_location_assignment PIN_F19  -to ERROR
-  ```
+- 新增 `quartus_compile/lock_pins.tcl`，包含常用引脚分配脚本，可在 Quartus Tcl Console 执行(执行后需要重新编译, 也可不执行脚本直接修改`.qsf`文件): 
+  - 图形化界面`Tools-Tcl scripts`手动添加或命令行执行`tcl`脚本:`source quartus_compile/lock_pins.tcl`
+  - 直接修改`lock.qsf`(把`tcl`脚本内容添加进去): `set_location_assignment PIN_Y2 -to CLK ...`
+- 主要引脚分配如下: 
+```
+set_location_assignment PIN_Y2   -to CLK
+set_location_assignment PIN_M23  -to RESET
+set_location_assignment PIN_M21  -to ENTER
+set_location_assignment PIN_N21  -to PRESS
+set_location_assignment PIN_AB28 -to MODE
 
+# 检查管脚前(分别对应SW[4], SW[5], SW[6], SW[7])
+#set_location_assignment PIN_AB27 -to CODE[3]
+#set_location_assignment PIN_AC26 -to CODE[2]
+#set_location_assignment PIN_AD26 -to CODE[1]
+#set_location_assignment PIN_AB26 -to CODE[0]
+# 检查管脚后(分别对应SW[4], SW[3], SW[2], SW[1])
+set_location_assignment PIN_AB27 -to CODE[3]
+set_location_assignment PIN_AD27 -to CODE[2]
+set_location_assignment PIN_AC27 -to CODE[1]
+set_location_assignment PIN_AC28 -to CODE[0]
+
+set_location_assignment PIN_G19  -to OPEN
+set_location_assignment PIN_F19  -to ERROR
+```
+**仔细对照开发手册检查管脚**
+**仔细对照开发手册检查管脚**
+**仔细对照开发手册检查管脚**
 ##### 3. 下载与测试流程
 1. 在 Quartus 中重新编译工程。
 2. 执行 `lock_pins.tcl` 脚本自动分配引脚。
 3. 下载 `.sof` 文件到开发板，拨码开关/按键/LED 即可直接交互测试密码锁功能。
 
-如需自定义更多功能或引脚，请参考开发板手册和 `lock_top.v` 进行扩展。
+#### `lock_top.v`下载开发板注意事项
+- 模板同仿真testbench类似, 只是无需声明仿真时间`timescale`和仿真激励输入`initial begin ...end`
+- 注意: 仿真和原理设计和实际开发板的高低电平有效/正负脉冲触发不一定一样, 此时需要根据手册+多次烧录验证对输入/输出信号(如ENTER, PRESS信号)取反处理:
+```v
+module Lock_Top(
+    input CLK,           // CLOCK_50, PIN_Y2
+    input RESET,         // KEY[0],   PIN_M23
+    input ENTER,         // KEY[1],   PIN_M21, 高电平有效
+    input PRESS,         // KEY[2],   PIN_N21, 高电平有效
+    input MODE,          // SW[0],    PIN_AB28, 高电平有效
+    input [3:0] CODE,    // SW[4:1],  PIN_AB27, PIN_AD27, PIN_AC27, PIN_AC28, 高电平有效
+    output OPEN,         // LEDR[0],  PIN_G19, 高电平有效
+    output ERROR,        // LEDR[1],  PIN_F19, 高电平有效
+    output [6:0] HEX0    // 七段数码管 HEX0, a~g, 低电平点亮
+);
+    // 输入按键信号全部取反, 适配低电平有效
+    wire enter_n  = ~ENTER;   // 低电平有效
+    wire press_n  = ~PRESS;   // 低电平有效
+
+    Lock_Password UUT(
+        .OPEN(OPEN),
+        .ERROR(ERROR),
+        .CODE(CODE),
+        .PRESS(press_n),
+        .ENTER(enter_n),
+        .CLK(CLK),
+        .RESET(RESET),
+        .MODE(MODE)
+    );
+```
+
+#### 新增功能: 使用数码管显示当前输入数字
+
+- 顶层文件 `lock_top.v` 在`module Lock_Top()`中已增加 HEX0 七段数码管端口`output [6:0] HEX0`
+```v
+// BCD转七段数码管显示，低电平点亮（共阳）
+reg [6:0] hex0_seg;
+always @(*) begin
+    case (CODE)
+        4'd0: hex0_seg = 7'b100_0000;
+        4'd1: hex0_seg = 7'b111_1001;
+        4'd2: hex0_seg = 7'b010_0100;
+        4'd3: hex0_seg = 7'b011_0000;
+        4'd4: hex0_seg = 7'b001_1001;
+        4'd5: hex0_seg = 7'b001_0010;
+        4'd6: hex0_seg = 7'b000_0010;
+        4'd7: hex0_seg = 7'b111_1000;
+        4'd8: hex0_seg = 7'b000_0000;
+        4'd9: hex0_seg = 7'b001_0000;
+        default: hex0_seg = 7'b111_1111;
+    endcase
+end
+assign HEX0 = hex0_seg;
+```
+- 数码管为共阳极，低电平点亮，显示范围0~9。
+- 只需将 HEX0[6:0] 分配到开发板对应引脚即可。
+  - HEX0 七段数码管引脚分配（a~g）
+  ```
+  set_location_assignment PIN_G18 -to HEX0[0]
+  set_location_assignment PIN_F22 -to HEX0[1]
+  set_location_assignment PIN_E17 -to HEX0[2]
+  set_location_assignment PIN_L26 -to HEX0[3]
+  set_location_assignment PIN_L25 -to HEX0[4]
+  set_location_assignment PIN_J22 -to HEX0[5]
+  set_location_assignment PIN_H22 -to HEX0[6]
+  ```
+
+  - 下载后, HEX0会实时显示拨码开关SW[4:1]BCD码对应数字
