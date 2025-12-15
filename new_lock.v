@@ -17,10 +17,12 @@ endmodule
 module Reg4(
     input [3:0] Pdata,
     input LD, CP,
+    input CLR,
     output reg [3:0] Q
 );
-always@(posedge CP) begin
-    if(LD) Q <= Pdata;          // 锁存输入数据
+always@(posedge CP or negedge CLR) begin
+    if(!CLR) Q <= 4'b0000;      // 复位清零（CLR=0）
+    else if(LD) Q <= Pdata;     // 锁存输入数据
     else Q <= Q;                // 保持原态
 end
 endmodule
@@ -39,6 +41,8 @@ endmodule
 // 4. 密码锁处理单元（简化模块调用，去掉冗余）
 module Lock_datapath(
     output AEQB, BITEQ,
+    output [15:0] SAVE_PWD,     // <-- 新增：导出保存密码（QA3..QA0）
+    output [15:0] INPUT_PWD,    // <-- 新增：导出输入密码（QB3..QB0）
     input [3:0] CODE,      // 0-9 BCD码输入
     input PRESS,           // 数字键按下（1=按下）
     input CLK, RESET,      // 时钟、复位（1=正常，0=复位）
@@ -50,25 +54,29 @@ wire [15:0] Save_Pwd, Input_Pwd; // 16位完整密码
 wire [1:0] CNT;                // 计数结果
 
 // 存储密码：4个4位寄存器级联（设密码模式时锁存）
-Reg4 RA0(.Pdata(CODE), .LD(!MODE & PRESS), .CP(CLK), .Q(QA0));
-Reg4 RA1(.Pdata(QA0), .LD(!MODE & PRESS), .CP(CLK), .Q(QA1));
-Reg4 RA2(.Pdata(QA1), .LD(!MODE & PRESS), .CP(CLK), .Q(QA2));
-Reg4 RA3(.Pdata(QA2), .LD(!MODE & PRESS), .CP(CLK), .Q(QA3));
+Reg4 RA0(.Pdata(CODE), .LD(!MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QA0));
+Reg4 RA1(.Pdata(QA0), .LD(!MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QA1));
+Reg4 RA2(.Pdata(QA1), .LD(!MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QA2));
+Reg4 RA3(.Pdata(QA2), .LD(!MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QA3));
 assign Save_Pwd = {QA3, QA2, QA1, QA0}; // 拼接16位存储密码
 
 // 输入密码：4个4位寄存器级联（解锁模式时锁存）
-Reg4 RB0(.Pdata(CODE), .LD(MODE & PRESS), .CP(CLK), .Q(QB0));
-Reg4 RB1(.Pdata(QB0), .LD(MODE & PRESS), .CP(CLK), .Q(QB1));
-Reg4 RB2(.Pdata(QB1), .LD(MODE & PRESS), .CP(CLK), .Q(QB2));
-Reg4 RB3(.Pdata(QB2), .LD(MODE & PRESS), .CP(CLK), .Q(QB3));
+Reg4 RB0(.Pdata(CODE), .LD(MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QB0));
+Reg4 RB1(.Pdata(QB0), .LD(MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QB1));
+Reg4 RB2(.Pdata(QB1), .LD(MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QB2));
+Reg4 RB3(.Pdata(QB2), .LD(MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QB3));
 assign Input_Pwd = {QB3, QB2, QB1, QB0}; // 拼接16位输入密码
+
+// <-- 新增：连接到输出端口（纯展示用）
+assign SAVE_PWD  = Save_Pwd;
+assign INPUT_PWD = Input_Pwd;
 
 // 密码比较：存储密码 vs 输入密码
 Comparator16 Comp_Pwd(.A(Save_Pwd), .B(Input_Pwd), .EQU(AEQB));
 
 // 计数：解锁模式下，按下数字键计数（计4次）
 UPCount CNT_inst(
-    .CLR(!RESET), .EN(PRESS & MODE & !BITEQ), .CP(CLK), .Q(CNT)
+    .CLR(RESET), .EN(PRESS & MODE & !BITEQ), .CP(CLK), .Q(CNT)
 );
 
 // 计数比较：是否计满4次（2'b11=3，对应4位输入）
@@ -126,6 +134,8 @@ endmodule
 // 6. 顶层模块（总入口，信号清晰，无冗余）
 module Lock_Password(
     output OPEN, ERROR,    // 开锁成功、密码错误输出
+    output [15:0] SAVE_PWD,    // <-- 新增：给真正顶层显示用
+    output [15:0] INPUT_PWD,   // <-- 新增：给真正顶层显示用
     input [3:0] CODE,      // 0-9按键BCD码（0=4'b0000~9=4'b1001）
     input PRESS,           // 数字键按下（1=按下，0=松开）
     input ENTER,           // 确认键（#键，1=按下）
@@ -140,6 +150,8 @@ wire AEQB, BITEQ;
 // 实例化两个核心单元
 Lock_datapath U_Datapath(
     .AEQB(AEQB), .BITEQ(BITEQ),
+    .SAVE_PWD(SAVE_PWD),        // <-- 新增连接
+    .INPUT_PWD(INPUT_PWD),      // <-- 新增连接
     .CODE(CODE), .PRESS(PRESS), .CLK(CLK), .RESET(RESET), .MODE(MODE)
 );
 

@@ -292,7 +292,7 @@ module Lock_Top(
     );
 ```
 
-#### 新增功能: 使用数码管显示当前输入数字
+#### 新增功能: 使用1位数码管显示当前输入数字
 
 - 顶层文件 `lock_top.v` 在`module Lock_Top()`中已增加 HEX0 七段数码管端口`output [6:0] HEX0`
 ```v
@@ -329,3 +329,64 @@ assign HEX0 = hex0_seg;
   ```
 
   - 下载后, HEX0会实时显示拨码开关SW[4:1]BCD码对应数字
+
+#### 新增功能: 使用4位数码管配合寄存器记录保存的密码/当前的输入
+本工程使用 **5 个七段数码管**（HEX0~HEX4）实现“实时输入 + 4位记录”的显示：
+
+- HEX4：实时显示拨码开关 `CODE[3:0]`（你当前准备输入的数字）。
+- HEX0~HEX3：显示 4 位寄存器内容。
+  - `MODE=0`（设密码）：显示保存的密码寄存器 `SAVE_PWD`。
+  - `MODE=1`（解锁）：显示当前输入寄存器 `INPUT_PWD`。
+  - 显示顺序：低位在 HEX0，高位在 HEX3。
+
+关键实现点：
+
+1) `new_lock.v` 中 `Lock_Password` 顶层导出内部寄存器拼接值（仅用于显示，不影响控制逻辑）：
+```verilog
+module Lock_Password(
+  output [15:0] SAVE_PWD,
+  output [15:0] INPUT_PWD,
+  ...
+);
+```
+
+1) `lock_top.v` 中将 `4bit(0~9)` BCD 码转换为七段码（共阳，低电平点亮），并将 `SAVE_PWD/INPUT_PWD` 的每个 nibble 映射到 HEX0~HEX3。
+
+为什么必须“上升沿检测（单脉冲）”？
+
+- 按键按下的持续时间（毫秒级）远大于系统时钟周期（50MHz 为 20ns）。
+- 如果将“按键电平”直接接入 `Reg4` 的 `LD`，在你按住按键期间会经历很多个时钟上升沿，从而**连续移位多次**，最终 4 级寄存器可能都被同一个 `CODE` 覆盖，表现为 **HEX0~HEX3 都显示相同**。
+- 解决方案：在 `lock_top.v` 对 `PRESS/ENTER` 做 2 级同步 + 上升沿检测，输出 1 个时钟周期宽度的 `press_pulse/enter_pulse`，再送入 `Lock_Password`。这样“按一下”只触发一次移位/计数。
+
+
+#### 新增功能: 添加RESET对4位数码管清零的功能
+
+需求：按下复位（`RESET=0`）时，不仅“显示清零”，松开复位后**寄存器内容也必须为 0000**。
+
+实现分两层：
+
+1) 顶层显示清零（`lock_top.v`）
+
+- 当 `RESET=0` 时，HEX0~HEX4 直接覆盖显示为 0（七段码 `bcd_to_7seg(4'd0)`）。
+- 当 `RESET=1` 时，恢复正常显示 `CODE/SAVE_PWD/INPUT_PWD`。
+
+2) 内部寄存器清零（`new_lock.v`）
+
+- 给 4 位寄存器 `Reg4` 增加异步清零端 `CLR`，并在 `Lock_datapath` 中把所有密码寄存器 `RA0~RA3/RB0~RB3` 的 `CLR` 连接到 `RESET`。
+```verilog
+module Reg4(
+  input [3:0] Pdata,
+  input LD, CP,
+  input CLR,
+  output reg [3:0] Q
+);
+always @(posedge CP or negedge CLR) begin
+  if(!CLR) Q <= 4'b0000;
+  else if(LD) Q <= Pdata;
+end
+endmodule
+```
+
+- 同时将计数器 `UPCount` 的清零端与 `RESET` 语义保持一致（`RESET=0` 复位清零）。
+
+这样，复位按下时显示为 0；复位松开后，内部寄存器确实已经被清成 0000，显示也会对应为 0000。
