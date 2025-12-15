@@ -372,7 +372,19 @@ module Lock_Password(
 
 2) 内部寄存器清零（`new_lock.v`）
 
-- 给 4 位寄存器 `Reg4` 增加异步清零端 `CLR`，并在 `Lock_datapath` 中把所有密码寄存器 `RA0~RA3/RB0~RB3` 的 `CLR` 连接到 `RESET`。
+- 给 4 位寄存器 `Reg4` 增加异步清零端 `CLR`（低电平有效）。
+- **重要：复位只清“当前模式”对应的寄存器**，避免在 `MODE=1`（解锁）时按下 `RESET` 把已经保存的密码清掉。
+  - `MODE=0`（设密码）：清保存寄存器 `RA0~RA3`。
+  - `MODE=1`（解锁）：清输入寄存器 `RB0~RB3`。
+
+实现方式是在 `Lock_datapath` 内生成两路清零信号：
+
+```verilog
+wire clr_save  = RESET | MODE;   // RESET=0 且 MODE=0 -> 清保存寄存器
+wire clr_input = RESET | ~MODE;  // RESET=0 且 MODE=1 -> 清输入寄存器
+```
+
+然后 `RA*` 使用 `clr_save`，`RB*` 使用 `clr_input`。
 ```verilog
 module Reg4(
   input [3:0] Pdata,
@@ -389,4 +401,7 @@ endmodule
 
 - 同时将计数器 `UPCount` 的清零端与 `RESET` 语义保持一致（`RESET=0` 复位清零）。
 
-这样，复位按下时显示为 0；复位松开后，内部寄存器确实已经被清成 0000，显示也会对应为 0000。
+这样，复位按下时显示为 0；复位松开后：
+
+- 设密码模式下：保存密码被清为 0000。
+- 解锁模式下：输入寄存器被清为 0000，但**保存密码仍保留**。

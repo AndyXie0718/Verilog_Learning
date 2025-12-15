@@ -53,18 +53,25 @@ wire [3:0] QB0, QB1, QB2, QB3; // 输入密码寄存器输出
 wire [15:0] Save_Pwd, Input_Pwd; // 16位完整密码
 wire [1:0] CNT;                // 计数结果
 
+// 复位策略：只清“当前模式”相关寄存器，避免解锁时清掉已保存密码
+// RESET=0 为复位有效（异步清零端 CLR 为低有效）
+// MODE=0(设密码)：清保存寄存器 RA0~RA3
+// MODE=1(解锁)：清输入寄存器 RB0~RB3
+wire clr_save  = RESET | MODE;   // RESET=0 且 MODE=0 -> 0：清保存寄存器
+wire clr_input = RESET | ~MODE;  // RESET=0 且 MODE=1 -> 0：清输入寄存器
+
 // 存储密码：4个4位寄存器级联（设密码模式时锁存）
-Reg4 RA0(.Pdata(CODE), .LD(!MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QA0));
-Reg4 RA1(.Pdata(QA0), .LD(!MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QA1));
-Reg4 RA2(.Pdata(QA1), .LD(!MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QA2));
-Reg4 RA3(.Pdata(QA2), .LD(!MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QA3));
+Reg4 RA0(.Pdata(CODE), .LD(!MODE & PRESS), .CP(CLK), .CLR(clr_save), .Q(QA0));
+Reg4 RA1(.Pdata(QA0), .LD(!MODE & PRESS), .CP(CLK), .CLR(clr_save), .Q(QA1));
+Reg4 RA2(.Pdata(QA1), .LD(!MODE & PRESS), .CP(CLK), .CLR(clr_save), .Q(QA2));
+Reg4 RA3(.Pdata(QA2), .LD(!MODE & PRESS), .CP(CLK), .CLR(clr_save), .Q(QA3));
 assign Save_Pwd = {QA3, QA2, QA1, QA0}; // 拼接16位存储密码
 
 // 输入密码：4个4位寄存器级联（解锁模式时锁存）
-Reg4 RB0(.Pdata(CODE), .LD(MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QB0));
-Reg4 RB1(.Pdata(QB0), .LD(MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QB1));
-Reg4 RB2(.Pdata(QB1), .LD(MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QB2));
-Reg4 RB3(.Pdata(QB2), .LD(MODE & PRESS), .CP(CLK), .CLR(RESET), .Q(QB3));
+Reg4 RB0(.Pdata(CODE), .LD(MODE & PRESS), .CP(CLK), .CLR(clr_input), .Q(QB0));
+Reg4 RB1(.Pdata(QB0), .LD(MODE & PRESS), .CP(CLK), .CLR(clr_input), .Q(QB1));
+Reg4 RB2(.Pdata(QB1), .LD(MODE & PRESS), .CP(CLK), .CLR(clr_input), .Q(QB2));
+Reg4 RB3(.Pdata(QB2), .LD(MODE & PRESS), .CP(CLK), .CLR(clr_input), .Q(QB3));
 assign Input_Pwd = {QB3, QB2, QB1, QB0}; // 拼接16位输入密码
 
 // <-- 新增：连接到输出端口（纯展示用）
