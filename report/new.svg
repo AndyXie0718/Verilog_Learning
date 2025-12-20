@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="750" viewBox="0 0 1100 750">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,4 L0,8 z" fill="#222"/>
+    </marker>
+
+    <style>
+      .state { fill: #fff; stroke: #2f6f73; stroke-width: 3; }
+      .edge { fill: none; stroke: #222; stroke-width: 2.2; marker-end: url(#arrow); }
+      .loop { fill: none; stroke: #222; stroke-width: 2.2; marker-end: url(#arrow); }
+
+      .t { font-family: "Times New Roman","Noto Serif",serif; font-size: 20px; fill: #222; }
+      .ts { font-family: "Times New Roman","Noto Serif",serif; font-size: 24px; fill: #222; }
+      .sub { font-family: "Times New Roman","Noto Serif",serif; font-size: 20px; fill: #222; font-style: italic; }
+      .ov { text-decoration: overline; }
+      .caption { font-family: "Noto Serif SC","Songti SC","SimSun",serif; font-size: 22px; fill: #2f6f73; font-weight: 600; }
+    </style>
+  </defs>
+
+  <!-- Layout (approx. matching photo) -->
+  <!-- S0 top -->
+  <ellipse class="state" cx="560" cy="120" rx="52" ry="36"/>
+  <text class="ts" x="560" y="115" text-anchor="middle">S<tspan baseline-shift="sub" font-size="16">0</tspan></text>
+  <text class="sub" x="560" y="140" text-anchor="middle">/CLR</text>
+
+  <!-- S1 -->
+  <circle class="state" cx="560" cy="250" r="34"/>
+  <text class="ts" x="560" y="258" text-anchor="middle">S<tspan baseline-shift="sub" font-size="16">1</tspan></text>
+
+  <!-- S2 -->
+  <circle class="state" cx="560" cy="415" r="34"/>
+  <text class="ts" x="560" y="423" text-anchor="middle">S<tspan baseline-shift="sub" font-size="16">2</tspan></text>
+
+  <!-- S3 left-bottom -->
+  <ellipse class="state" cx="305" cy="560" rx="58" ry="40"/>
+  <text class="ts" x="305" y="555" text-anchor="middle">S<tspan baseline-shift="sub" font-size="16">3</tspan></text>
+  <text class="sub" x="305" y="582" text-anchor="middle">/OPEN</text>
+
+  <!-- S4 right-bottom -->
+  <ellipse class="state" cx="820" cy="560" rx="62" ry="40"/>
+  <text class="ts" x="820" y="555" text-anchor="middle">S<tspan baseline-shift="sub" font-size="16">4</tspan></text>
+  <text class="sub" x="820" y="582" text-anchor="middle">/ERROR</text>
+
+  <!-- RESET arrow into S0 -->
+  <path class="edge" d="M680 55 L600 98"/>
+  <text class="t" x="690" y="52" text-anchor="start">RESET</text>
+
+  <!-- S0 self-loop (PRESS with overline) -->
+  <path class="loop" d="M535 85 C480 70, 480 145, 535 140"/>
+  <text class="t ov" x="455" y="105" text-anchor="middle">PRESS</text>
+
+  <!-- S0 -> S1 (PRESS) -->
+  <path class="edge" d="M560 156 L560 214"/>
+  <text class="t" x="510" y="190" text-anchor="middle">PRESS</text>
+
+  <!-- S1 self-loop: overline(ENTER·PRESS) -->
+  <path class="loop" d="M590 225 C640 220, 640 280, 590 278"/>
+  <text class="t ov" x="700" y="238" text-anchor="middle">ENTER · PRESS</text>
+
+  <!-- S1 -> S2 : overline(ENTER · PRESS · BITEQ) -->
+  <path class="edge" d="M560 284 L560 381"/>
+  <text class="t ov" x="360" y="340" text-anchor="start">ENTER · PRESS · BITEQ</text>
+
+  <!-- S1 -> S4 : ENTER (big arc) -->
+  <path class="edge" d="M585 260 C760 320, 860 410, 845 520"/>
+  <text class="t" x="800" y="360" text-anchor="middle">ENTER</text>
+
+  <!-- S1 -> (right) label: ENTER·PRESS·overline(BITEQ) / EN (as in photo) -->
+  <text class="t" x="675" y="275" text-anchor="start">
+    ENTER · PRESS · <tspan class="ov">BITEQ</tspan>/EN
+  </text>
+
+  <!-- S2 self-loop (small) -->
+  <path class="loop" d="M535 400 C500 398, 500 440, 535 438"/>
+
+  <!-- S2 -> S3 : AEQB · overline(PRESS) · ENTER -->
+  <path class="edge" d="M535 430 L355 535"/>
+  <text class="t" x="320" y="430" text-anchor="middle">
+    AEQB · <tspan class="ov">PRESS</tspan> · ENTER
+  </text>
+
+  <!-- S2 -> S4 : AEQB + AEQB · PRESS (as printed) -->
+  <path class="edge" d="M585 430 L770 535"/>
+  <text class="t" x="745" y="445" text-anchor="middle">AEQB+AEQB · PRESS</text>
+
+  <!-- S3 self-loop -->
+  <path class="loop" d="M270 520 C210 510, 210 610, 270 600"/>
+
+  <!-- S4 self-loop -->
+  <path class="loop" d="M865 525 C925 515, 925 610, 865 600"/>
+
+  <!-- Caption -->
+  <text class="caption" x="550" y="645" text-anchor="middle">控制单元状态转换图</text>
+</svg>
